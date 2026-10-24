@@ -230,6 +230,7 @@ def register_peer(team_id, user_id, username="player"):
 PrivateKey = {priv}
 Address = {record['ip']}/24
 DNS = {WG_DNS}
+MTU = 1420
 
 [Peer]
 PublicKey = {server_pub}
@@ -267,6 +268,7 @@ PersistentKeepalive = 25
 PrivateKey = {priv_key}
 Address = {assigned_ip}/24
 DNS = {WG_DNS}
+MTU = 1420
 
 [Peer]
 PublicKey = {server_pub}
