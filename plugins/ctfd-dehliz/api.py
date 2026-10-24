@@ -42,6 +42,19 @@ def format_user_access(container: DehlizContainer, challenge: DehlizChallenge):
     )
 
 
+def _get_challenge_id():
+    req_data = request.get_json(silent=True) or request.form or {}
+    raw_id = None
+    if isinstance(req_data, dict):
+        raw_id = req_data.get("challenge_id")
+    if not raw_id and hasattr(request, "args"):
+        raw_id = request.args.get("challenge_id")
+    try:
+        return int(raw_id)
+    except (TypeError, ValueError):
+        return None
+
+
 # =========================================================================
 # 1. KULLANICI KONTEYNER API'LERİ (Yarışmacı Soru Arayüzü)
 # =========================================================================
@@ -52,7 +65,7 @@ def get_container_status():
         return jsonify({"success": False, "message": "Giriş yapmalısınız."}), 403
 
     user = get_current_user()
-    challenge_id = request.args.get("challenge_id", type=int)
+    challenge_id = _get_challenge_id()
     if not challenge_id:
         return jsonify({"success": False, "message": "challenge_id parametresi gereklidir."}), 400
 
@@ -89,8 +102,7 @@ def start_container():
         return jsonify({"success": False, "message": "Giriş yapmalısınız."}), 403
 
     user = get_current_user()
-    req_data = request.get_json(silent=True) or request.form
-    challenge_id = req_data.get("challenge_id", type=int)
+    challenge_id = _get_challenge_id()
     if not challenge_id:
         return jsonify({"success": False, "message": "challenge_id gereklidir."}), 400
 
@@ -126,8 +138,9 @@ def stop_container():
         return jsonify({"success": False, "message": "Giriş yapmalısınız."}), 403
 
     user = get_current_user()
-    req_data = request.get_json(silent=True) or request.form
-    challenge_id = req_data.get("challenge_id", type=int) if req_data else request.args.get("challenge_id", type=int)
+    challenge_id = _get_challenge_id()
+    if not challenge_id:
+        return jsonify({"success": False, "message": "challenge_id gereklidir."}), 400
 
     ok, msg = DockerManager.destroy_instance(user.id, challenge_id)
     return jsonify({"success": ok, "message": msg})
@@ -139,8 +152,9 @@ def renew_container():
         return jsonify({"success": False, "message": "Giriş yapmalısınız."}), 403
 
     user = get_current_user()
-    req_data = request.get_json(silent=True) or request.form
-    challenge_id = req_data.get("challenge_id", type=int)
+    challenge_id = _get_challenge_id()
+    if not challenge_id:
+        return jsonify({"success": False, "message": "challenge_id gereklidir."}), 400
 
     ok, res = DockerManager.renew_instance(user.id, challenge_id)
     if not ok:
