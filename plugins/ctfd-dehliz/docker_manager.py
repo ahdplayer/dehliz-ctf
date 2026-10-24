@@ -132,15 +132,15 @@ class DockerManager:
         slug = slugify(challenge.name)
         domain = f"{slug}-{identifier}.{DEHLIZ_DOMAIN}"
 
-        # 8. Gateway DNS Sunucusuna Canlı Kayıt Ekle
+        # 8. Gateway DNS Sunucusuna Canlı Kayıt & Mikro-Bölümleme Kuralı Ekle
         try:
             requests.post(
                 f"{VPN_API_URL}/api/dns",
-                json={"domain": domain, "ip": container_ip},
+                json={"domain": domain, "ip": container_ip, "team_id": team_id},
                 timeout=2
             )
         except Exception as e:
-            current_app.logger.warning(f"[Dehliz CTF] DNS kayit uyarisi: {e}")
+            current_app.logger.warning(f"[Dehliz CTF] DNS/Firewall kayit uyarisi: {e}")
 
         # 9. Veritabanına Kaydet
         timeout_seconds = int(get_config("dehliz:timeout", 3600))
@@ -174,6 +174,16 @@ class DockerManager:
 
         if not record:
             return False, "Calisan bir konteyner bulunamadi."
+
+        # Gateway DNS & Firewall Kaydını Sil
+        try:
+            requests.delete(
+                f"{VPN_API_URL}/api/dns",
+                json={"domain": record.domain, "ip": record.ip_address, "team_id": record.team_id},
+                timeout=2
+            )
+        except Exception as e:
+            current_app.logger.warning(f"[Dehliz CTF] DNS/Firewall silme uyarisi: {e}")
 
         client = get_docker_client()
         try:
@@ -212,6 +222,14 @@ class DockerManager:
         client = get_docker_client()
 
         for c in expired:
+            try:
+                requests.delete(
+                    f"{VPN_API_URL}/api/dns",
+                    json={"domain": c.domain, "ip": c.ip_address, "team_id": c.team_id},
+                    timeout=2
+                )
+            except Exception:
+                pass
             try:
                 service = client.services.get(c.docker_id)
                 service.remove()
