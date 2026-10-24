@@ -18,17 +18,17 @@
 <div class="container my-4">
     <ul class="nav nav-pills mb-4" id="dehlizAdminTabs" role="tablist">
         <li class="nav-item">
-            <a class="nav-link active font-weight-bold" id="instances-tab" data-toggle="pill" href="#instances" role="tab">
+            <a class="nav-link active font-weight-bold" id="instances-tab" data-bs-toggle="pill" data-toggle="pill" data-bs-target="#instances" href="#instances" role="tab">
                 🎯 Canlı Lab Konteynerleri ({{ instances|length }})
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link font-weight-bold" id="gateway-tab" data-toggle="pill" href="#gateway" role="tab">
+            <a class="nav-link font-weight-bold" id="gateway-tab" data-bs-toggle="pill" data-toggle="pill" data-bs-target="#gateway" href="#gateway" role="tab">
                 📡 WireGuard &amp; DNS Durumu
             </a>
         </li>
         <li class="nav-item">
-            <a class="nav-link font-weight-bold" id="settings-tab" data-toggle="pill" href="#settings" role="tab">
+            <a class="nav-link font-weight-bold" id="settings-tab" data-bs-toggle="pill" data-toggle="pill" data-bs-target="#settings" href="#settings" role="tab">
                 ⚙️ Sistem Ayarları
             </a>
         </li>
@@ -198,4 +198,26 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    var tabs = document.querySelectorAll("#dehlizAdminTabs .nav-link");
+    tabs.forEach(function (tab) {
+        tab.addEventListener("click", function (e) {
+            e.preventDefault();
+            tabs.forEach(function (t) { t.classList.remove("active"); });
+            this.classList.add("active");
+
+            var panes = document.querySelectorAll("#dehlizAdminTabContent .tab-pane");
+            panes.forEach(function (p) { p.classList.remove("show", "active"); });
+
+            var targetSelector = this.getAttribute("data-bs-target") || this.getAttribute("href");
+            var targetPane = document.querySelector(targetSelector);
+            if (targetPane) {
+                targetPane.classList.add("show", "active");
+            }
+        });
+    });
+});
+</script>
 {% endblock %}

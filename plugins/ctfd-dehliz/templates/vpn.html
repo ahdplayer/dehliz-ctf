@@ -120,13 +120,13 @@
                 <div class="card-body">
                     <ul class="nav nav-tabs mb-3" id="osTabs" role="tablist">
                         <li class="nav-item">
-                            <a class="nav-link active font-weight-bold" id="win-tab" data-toggle="tab" href="#win" role="tab">Windows</a>
+                            <a class="nav-link active font-weight-bold" id="win-tab" data-bs-toggle="tab" data-toggle="tab" data-bs-target="#win" href="#win" role="tab">Windows</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link font-weight-bold" id="kali-tab" data-toggle="tab" href="#kali" role="tab">Kali / Linux</a>
+                            <a class="nav-link font-weight-bold" id="kali-tab" data-bs-toggle="tab" data-toggle="tab" data-bs-target="#kali" href="#kali" role="tab">Kali / Linux</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-link font-weight-bold" id="mac-tab" data-toggle="tab" href="#mac" role="tab">macOS</a>
+                            <a class="nav-link font-weight-bold" id="mac-tab" data-bs-toggle="tab" data-toggle="tab" data-bs-target="#mac" href="#mac" role="tab">macOS</a>
                         </li>
                     </ul>
                     <div class="tab-content" id="osTabsContent">
@@ -170,4 +170,29 @@ sudo wg-quick up dehliz</code></pre>
     </div>
     {% endif %}
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    var tabs = document.querySelectorAll("#osTabs .nav-link");
+    tabs.forEach(function (tab) {
+        tab.addEventListener("click", function (e) {
+            e.preventDefault();
+            // Tüm sekmelerden active kaldır
+            tabs.forEach(function (t) { t.classList.remove("active"); });
+            this.classList.add("active");
+
+            // Tüm içerik panellerini gizle
+            var panes = document.querySelectorAll("#osTabsContent .tab-pane");
+            panes.forEach(function (p) { p.classList.remove("show", "active"); });
+
+            // Hedef paneli göster
+            var targetSelector = this.getAttribute("data-bs-target") || this.getAttribute("href");
+            var targetPane = document.querySelector(targetSelector);
+            if (targetPane) {
+                targetPane.classList.add("show", "active");
+            }
+        });
+    });
+});
+</script>
 {% endblock %}
