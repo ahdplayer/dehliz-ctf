@@ -1,7 +1,7 @@
 FROM docker:latest AS docker-cli
 FROM docker/compose-bin:latest AS compose-bin
 
-FROM ctfd/ctfd:3.6.0
+FROM ctfd/ctfd:3.8.9
 
 USER root
 
