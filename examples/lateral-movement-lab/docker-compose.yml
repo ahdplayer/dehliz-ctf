@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  web-dmz:
+    image: dehliz/pivoting-dmz-web:latest
+    labels:
+      - "dehliz.entrypoint=true"
+    networks:
+      - dehliz_containers
+      - internal_corp_net
+    environment:
+      - FLAG_INITIAL=DEHLIZ{dmz_web_erisim_basarili}
+    ports:
+      - "5000"
+
+  internal-target:
+    image: dehliz/pivoting-internal-target:latest
+    networks:
+      - internal_corp_net
+    environment:
+      - FLAG_FINAL=DEHLIZ{lateral_movement_basariyla_tamamlandi}
+
+networks:
+  dehliz_containers:
+    external: true
+  internal_corp_net:
+    driver: bridge
