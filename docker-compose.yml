@@ -1,0 +1,87 @@
+services:
+  ctfd:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    user: root
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - SECRET_KEY=${SECRET_KEY:-dehliz_secret_key_prod_2026_super_secure}
+      - UPLOAD_FOLDER=/var/uploads
+      - DATABASE_URL=mysql+pymysql://${MYSQL_USER:-ctfd}:${MYSQL_PASSWORD:-dehliz_db_pass_2026}@db/${MYSQL_DATABASE:-ctfd}?charset=utf8mb4
+      - REDIS_URL=redis://cache:6379
+      - WORKERS=2
+      - LOG_FOLDER=/var/log/CTFd
+      - ACCESS_LOG=-
+      - ERROR_LOG=-
+      - REVERSE_PROXY=false
+      - VPN_API_URL=http://vpn-gateway:5000
+      - DEHLIZ_DOMAIN=${DEHLIZ_DOMAIN:-dehliz.local}
+    volumes:
+      - .data/CTFd/logs:/var/log/CTFd
+      - .data/CTFd/uploads:/var/uploads
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./plugins/ctfd-wireguard:/opt/CTFd/CTFd/plugins/ctfd-wireguard
+      - ./plugins/ctfd-whale:/opt/CTFd/CTFd/plugins/ctfd-whale
+    networks:
+      - dehliz_bridge
+    depends_on:
+      - db
+      - cache
+      - vpn-gateway
+
+  vpn-gateway:
+    build: ./gateway
+    container_name: dehliz_vpn_gateway
+    restart: always
+    cap_add:
+      - NET_ADMIN
+      - SYS_MODULE
+    sysctls:
+      - net.ipv4.ip_forward=1
+    ports:
+      - "${WG_PORT:-51820}:51820/udp"
+    environment:
+      - WG_HOST=${WG_HOST:-127.0.0.1}
+      - WG_PORT=${WG_PORT:-51820}
+      - DEHLIZ_DOMAIN=${DEHLIZ_DOMAIN:-dehliz.local}
+    volumes:
+      - .data/wireguard:/etc/wireguard
+    networks:
+      - dehliz_bridge
+      - dehliz_containers
+
+  db:
+    image: mariadb:10.4.12
+    restart: always
+    command: [
+      "mysqld",
+      "--character-set-server=utf8mb4",
+      "--collation-server=utf8mb4_unicode_ci"
+    ]
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD:-dehliz_root_pass_2026}
+      - MYSQL_USER=${MYSQL_USER:-ctfd}
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD:-dehliz_db_pass_2026}
+      - MYSQL_DATABASE=${MYSQL_DATABASE:-ctfd}
+    volumes:
+      - .data/mysql:/var/lib/mysql
+    networks:
+      - dehliz_bridge
+
+  cache:
+    image: redis:4
+    restart: always
+    volumes:
+      - .data/redis:/data
+    networks:
+      - dehliz_bridge
+
+networks:
+  dehliz_bridge:
+    driver: bridge
+  dehliz_containers:
+    name: dehliz_containers
+    external: true
