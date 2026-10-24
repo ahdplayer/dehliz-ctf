@@ -2,11 +2,13 @@ import os
 import datetime
 import requests
 from flask import Blueprint, request, jsonify, render_template, Response, redirect, url_for
+from CTFd.models import Challenges, db
 from CTFd.utils.user import get_current_user, authed
 from CTFd.utils.decorators import admins_only
 from CTFd.utils import get_config, set_config
-from .models import DehlizContainer, DehlizChallenge, db
+from .models import DehlizContainer, DehlizChallenge, DehlizComposeChallenge, DehlizComposeInstance
 from .docker_manager import DockerManager
+from .compose_manager import ComposeManager
 
 VPN_API_URL = os.environ.get("VPN_API_URL", "http://vpn-gateway:5000")
 
@@ -19,16 +21,16 @@ dehliz_bp = Blueprint(
 )
 
 
-def format_user_access(container: DehlizContainer, challenge: DehlizChallenge):
-    host = container.domain
-    port = container.port or 80
-    cat = str(challenge.category or "").lower()
+def format_user_access(domain, port, ip_address, category="web"):
+    host = domain
+    port = port or 80
+    cat = str(category or "").lower()
 
     if "web" in cat or port in (80, 443, 3000, 5000, 8000, 8080):
         return (
             f'<div class="mb-2">'
             f'<span class="badge bg-success badge-success text-white px-2 py-1" style="background-color: #28a745 !important; color: #ffffff !important;">🛡️ WireGuard &amp; Yerel DNS</span> '
-            f'<small class="text-muted font-weight-bold">({container.ip_address})</small>'
+            f'<small class="text-muted font-weight-bold">({ip_address})</small>'
             f'</div>'
             f'<a target="_blank" class="btn btn-primary btn-sm text-white font-weight-bold shadow-sm" '
             f'href="http://{host}:{port}/">🌐 http://{host}:{port}</a>'
@@ -36,7 +38,7 @@ def format_user_access(container: DehlizContainer, challenge: DehlizChallenge):
     return (
         f'<div class="mb-2">'
         f'<span class="badge bg-success badge-success text-white px-2 py-1" style="background-color: #28a745 !important; color: #ffffff !important;">🛡️ WireGuard &amp; Yerel DNS</span> '
-        f'<small class="text-muted font-weight-bold">({container.ip_address})</small>'
+        f'<small class="text-muted font-weight-bold">({ip_address})</small>'
         f'</div>'
         f'<code class="p-2 border rounded bg-light font-weight-bold text-dark">nc {host} {port}</code>'
     )
@@ -70,18 +72,46 @@ def get_container_status():
     if not challenge_id:
         return jsonify({"success": False, "message": "challenge_id parametresi gereklidir."}), 400
 
+    challenge = Challenges.query.filter_by(id=challenge_id).first()
+    if not challenge:
+        return jsonify({"success": False, "message": "Soru bulunamadı."}), 404
+
+    now = datetime.datetime.utcnow()
+
+    # 1. Compose Sorusu İse
+    if challenge.type == "dehliz_compose":
+        inst = ComposeManager.get_user_instance(user.id, challenge_id, team_id=team_id)
+        if not inst:
+            return jsonify({"success": True, "data": {"status": "stopped"}})
+        if inst.expire_time <= now:
+            ComposeManager.destroy_instance(user.id, challenge_id, team_id=team_id)
+            return jsonify({"success": True, "data": {"status": "stopped"}})
+        remaining = int((inst.expire_time - now).total_seconds())
+        user_access = format_user_access(inst.domain, inst.port, inst.entrypoint_ip, challenge.category)
+        return jsonify({
+            "success": True,
+            "data": {
+                "status": "running",
+                "remaining_time": remaining,
+                "domain": inst.domain,
+                "ip": inst.entrypoint_ip,
+                "port": inst.port,
+                "renew_count": inst.renew_count,
+                "user_access": user_access
+            }
+        })
+
+    # 2. Standart Tekli Docker Sorusu İse
     container = DockerManager.get_user_container(user.id, challenge_id, team_id=team_id)
     if not container:
         return jsonify({"success": True, "data": {"status": "stopped"}})
 
-    now = datetime.datetime.utcnow()
     if container.expire_time <= now:
         DockerManager.destroy_instance(user.id, challenge_id, team_id=team_id)
         return jsonify({"success": True, "data": {"status": "stopped"}})
 
     remaining = int((container.expire_time - now).total_seconds())
-    challenge = DehlizChallenge.query.filter_by(id=challenge_id).first()
-    user_access = format_user_access(container, challenge) if challenge else ""
+    user_access = format_user_access(container.domain, container.port, container.ip_address, challenge.category)
 
     return jsonify({
         "success": True,
@@ -103,21 +133,52 @@ def start_container():
         return jsonify({"success": False, "message": "Giriş yapmalısınız."}), 403
 
     user = get_current_user()
+    team_id = user.team_id if user.team_id else user.id
     challenge_id = _get_challenge_id()
     if not challenge_id:
         return jsonify({"success": False, "message": "challenge_id gereklidir."}), 400
 
-    challenge = DehlizChallenge.query.filter_by(id=challenge_id).first()
+    challenge = Challenges.query.filter_by(id=challenge_id).first()
     if not challenge:
         return jsonify({"success": False, "message": "Soru bulunamadı."}), 404
 
-    team_id = user.team_id if user.team_id else user.id
-    ok, container, msg = DockerManager.create_instance(user.id, team_id, challenge)
+    # 1. Compose Sorusu Başlatma
+    if challenge.type == "dehliz_compose":
+        comp_chall = DehlizComposeChallenge.query.filter_by(id=challenge_id).first()
+        if not comp_chall:
+            return jsonify({"success": False, "message": "Compose soru yapılandırması bulunamadı."}), 404
+
+        ok, inst, msg = ComposeManager.create_instance(user.id, team_id, comp_chall)
+        if not ok:
+            return jsonify({"success": False, "message": msg}), 400
+
+        remaining = int((inst.expire_time - datetime.datetime.utcnow()).total_seconds())
+        user_access = format_user_access(inst.domain, inst.port, inst.entrypoint_ip, challenge.category)
+
+        return jsonify({
+            "success": True,
+            "message": msg,
+            "data": {
+                "status": "running",
+                "remaining_time": remaining,
+                "domain": inst.domain,
+                "ip": inst.entrypoint_ip,
+                "port": inst.port,
+                "user_access": user_access
+            }
+        })
+
+    # 2. Standart Tekli Docker Sorusu Başlatma
+    docker_chall = DehlizChallenge.query.filter_by(id=challenge_id).first()
+    if not docker_chall:
+        return jsonify({"success": False, "message": "Soru bulunamadı."}), 404
+
+    ok, container, msg = DockerManager.create_instance(user.id, team_id, docker_chall)
     if not ok:
         return jsonify({"success": False, "message": msg}), 400
 
     remaining = int((container.expire_time - datetime.datetime.utcnow()).total_seconds())
-    user_access = format_user_access(container, challenge)
+    user_access = format_user_access(container.domain, container.port, container.ip_address, challenge.category)
 
     return jsonify({
         "success": True,
@@ -144,7 +205,12 @@ def stop_container():
     if not challenge_id:
         return jsonify({"success": False, "message": "challenge_id gereklidir."}), 400
 
-    ok, msg = DockerManager.destroy_instance(user.id, challenge_id, team_id=team_id)
+    challenge = Challenges.query.filter_by(id=challenge_id).first()
+    if challenge and challenge.type == "dehliz_compose":
+        ok, msg = ComposeManager.destroy_instance(user.id, challenge_id, team_id=team_id)
+    else:
+        ok, msg = DockerManager.destroy_instance(user.id, challenge_id, team_id=team_id)
+
     return jsonify({"success": ok, "message": msg})
 
 
@@ -159,7 +225,12 @@ def renew_container():
     if not challenge_id:
         return jsonify({"success": False, "message": "challenge_id gereklidir."}), 400
 
-    ok, res = DockerManager.renew_instance(user.id, challenge_id, team_id=team_id)
+    challenge = Challenges.query.filter_by(id=challenge_id).first()
+    if challenge and challenge.type == "dehliz_compose":
+        ok, res = ComposeManager.renew_instance(user.id, challenge_id, team_id=team_id)
+    else:
+        ok, res = DockerManager.renew_instance(user.id, challenge_id, team_id=team_id)
+
     if not ok:
         return jsonify({"success": False, "message": res}), 400
 
@@ -234,6 +305,7 @@ def vpn_download():
 @admins_only
 def admin_dashboard():
     instances = DehlizContainer.query.order_by(DehlizContainer.start_time.desc()).all()
+    compose_instances = DehlizComposeInstance.query.order_by(DehlizComposeInstance.start_time.desc()).all()
 
     # Gateway canlı istatistikleri
     gw_stats = {}
@@ -248,12 +320,14 @@ def admin_dashboard():
         "timeout": get_config("dehliz:timeout", 3600),
         "renew_time": get_config("dehliz:renew_time", 1800),
         "max_renews": get_config("dehliz:max_renews", 5),
-        "max_containers": get_config("dehliz:max_containers", 100)
+        "max_containers": get_config("dehliz:max_containers", 100),
+        "max_compose_instances": get_config("dehliz:max_compose_instances", 30)
     }
 
     return render_template(
         "admin_dehliz.html",
         instances=instances,
+        compose_instances=compose_instances,
         gw_stats=gw_stats,
         settings=settings,
         now=datetime.datetime.utcnow()
@@ -267,6 +341,7 @@ def admin_save_settings():
     set_config("dehliz:renew_time", request.form.get("renew_time", 1800))
     set_config("dehliz:max_renews", request.form.get("max_renews", 5))
     set_config("dehliz:max_containers", request.form.get("max_containers", 100))
+    set_config("dehliz:max_compose_instances", request.form.get("max_compose_instances", 30))
     return redirect(url_for("ctfd-dehliz.admin_dashboard"))
 
 
@@ -274,4 +349,11 @@ def admin_save_settings():
 @admins_only
 def admin_terminate_instance(container_id):
     DockerManager.destroy_instance(user_id=None, container_id=container_id)
+    return redirect(url_for("ctfd-dehliz.admin_dashboard"))
+
+
+@dehliz_bp.route("/admin/dehliz/terminate-compose/<int:instance_id>", methods=["POST"])
+@admins_only
+def admin_terminate_compose_instance(instance_id):
+    ComposeManager.destroy_instance(instance_id=instance_id)
     return redirect(url_for("ctfd-dehliz.admin_dashboard"))

@@ -1,10 +1,12 @@
 import math
+import json
 from flask import Blueprint
 from CTFd.models import db, Flags
 from CTFd.plugins.challenges import BaseChallenge
 from CTFd.plugins.flags import get_flag_class
-from .models import DehlizChallenge, DehlizContainer
+from .models import DehlizChallenge, DehlizContainer, DehlizComposeChallenge, DehlizComposeInstance
 from .docker_manager import DockerManager
+from .compose_manager import ComposeManager
 
 
 def calculate_decay(challenge):
@@ -143,3 +145,126 @@ class DehlizDockerChallenge(BaseChallenge):
             except Exception:
                 pass
         super().delete(challenge)
+
+
+class DehlizComposeChallengeType(BaseChallenge):
+    id = "dehliz_compose"
+    name = "dehliz_compose"
+    templates = {
+        "create": "/plugins/ctfd-dehliz/assets/create_compose.html",
+        "update": "/plugins/ctfd-dehliz/assets/update_compose.html",
+        "view": "/plugins/ctfd-dehliz/assets/view.html",
+    }
+    scripts = {
+        "create": "/plugins/ctfd-dehliz/assets/create_compose.js",
+        "update": "/plugins/ctfd-dehliz/assets/update_compose.js",
+        "view": "/plugins/ctfd-dehliz/assets/view.js",
+    }
+    challenge_model = DehlizComposeChallenge
+
+    @classmethod
+    def read(cls, challenge):
+        challenge = DehlizComposeChallenge.query.filter_by(id=challenge.id).first()
+        data = {
+            "id": challenge.id,
+            "name": challenge.name,
+            "value": challenge.value,
+            "initial": challenge.initial,
+            "decay": challenge.decay,
+            "minimum": challenge.minimum,
+            "description": challenge.description,
+            "category": challenge.category,
+            "state": challenge.state,
+            "max_attempts": challenge.max_attempts,
+            "type": challenge.type,
+            "compose_content": challenge.compose_content,
+            "entrypoint_service": challenge.entrypoint_service,
+            "container_port": challenge.container_port,
+            "total_memory_limit": challenge.total_memory_limit,
+            "dynamic_score": int(challenge.dynamic_score),
+            "type_data": {
+                "id": cls.id,
+                "name": cls.name,
+                "templates": cls.templates,
+                "scripts": cls.scripts,
+            },
+        }
+        return data
+
+    @classmethod
+    def update(cls, challenge, request):
+        data = request.form or request.get_json()
+        for attr, value in data.items():
+            if attr in ("initial", "minimum", "decay"):
+                value = float(value)
+            elif attr in ("container_port", "value"):
+                value = int(value)
+            elif attr == "dynamic_score":
+                value = bool(int(value))
+            setattr(challenge, attr, value)
+
+        if challenge.dynamic_score:
+            challenge.value = calculate_decay(challenge)
+        else:
+            challenge.value = challenge.initial
+
+        db.session.commit()
+        return challenge
+
+    @classmethod
+    def attempt(cls, challenge, request):
+        data = request.form or request.get_json()
+        submission = data.get("submission", "").strip()
+
+        # 1. Kullanıcının/Takımın dinamik compose bayrakları kontrolü
+        from CTFd.utils.user import get_current_user
+        user = get_current_user()
+        if user:
+            inst = ComposeManager.get_user_instance(user.id, challenge.id, team_id=user.team_id)
+            if inst and inst.flags:
+                try:
+                    flags_dict = json.loads(inst.flags)
+                    if submission in flags_dict.values():
+                        return True, "Doğru Bayrak!"
+                except Exception:
+                    if submission in inst.flags:
+                        return True, "Doğru Bayrak!"
+
+        # 2. Standart CTFd bayrak tablosu kontrolü
+        flags = Flags.query.filter_by(challenge_id=challenge.id).all()
+        for flag in flags:
+            try:
+                flag_class = get_flag_class(flag.type)
+                if flag_class.compare(flag, submission):
+                    return True, "Doğru Bayrak!"
+            except Exception:
+                if flag.content == submission:
+                    return True, "Doğru Bayrak!"
+
+        return False, "Hatalı Bayrak."
+
+    @classmethod
+    def solve(cls, user, team, challenge, request):
+        super().solve(user, team, challenge, request)
+        if challenge.dynamic_score:
+            challenge.value = calculate_decay(challenge)
+            db.session.commit()
+
+        # Bayrak çözüldüğünde tüm compose ortamını otomatik kapat
+        try:
+            team_id = team.id if team else getattr(user, "team_id", None)
+            ComposeManager.destroy_instance(user_id=user.id, challenge_id=challenge.id, team_id=team_id)
+        except Exception:
+            pass
+
+    @classmethod
+    def delete(cls, challenge):
+        # Soru silindiğinde bağlı tüm canlı compose lablarını temizle
+        instances = DehlizComposeInstance.query.filter_by(challenge_id=challenge.id).all()
+        for inst in instances:
+            try:
+                ComposeManager.destroy_instance(instance_id=inst.id)
+            except Exception:
+                pass
+        super().delete(challenge)
+

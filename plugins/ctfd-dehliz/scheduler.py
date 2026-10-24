@@ -9,7 +9,9 @@ def start_cleaner(app):
             with app.app_context():
                 try:
                     from .docker_manager import DockerManager
+                    from .compose_manager import ComposeManager
                     DockerManager.cleanup_expired_instances()
+                    ComposeManager.cleanup_expired_instances()
                 except Exception as e:
                     app.logger.warning(f"[Dehliz Cleaner] Temizleme hatasi: {e}")
 

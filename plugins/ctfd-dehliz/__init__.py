@@ -4,7 +4,7 @@ from CTFd.plugins import (
     register_admin_plugin_menu_bar,
 )
 from CTFd.plugins.challenges import CHALLENGE_CLASSES, BaseChallenge
-from .challenge_type import DehlizDockerChallenge
+from .challenge_type import DehlizDockerChallenge, DehlizComposeChallengeType
 from .api import dehliz_bp
 from .scheduler import start_cleaner
 
@@ -41,8 +41,9 @@ def load(app):
     # 1. Veritabanı tablolarını otomatik oluştur (dehliz_containers vb.)
     app.db.create_all()
 
-    # 2. Dehliz Soru Tipini CTFd'ye kaydet
+    # 2. Dehliz Soru Tiplerini (Tekli Docker ve Çoklu Compose) CTFd'ye kaydet
     CHALLENGE_CLASSES["dehliz_docker"] = DehlizDockerChallenge
+    CHALLENGE_CLASSES["dehliz_compose"] = DehlizComposeChallengeType
 
     # 3. Tüm soru tipleri için çözüldüğünde otomatik kapatma kancasını tak
     install_solve_auto_cleanup()

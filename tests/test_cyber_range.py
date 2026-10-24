@@ -547,6 +547,115 @@ with app.app_context():
         log_fail("Otomatik kapatma testi sırasında istisna", str(e))
 
 
+def test_12_compose_lateral_movement():
+    log_step("12. Çoklu Konteyner & Lateral Movement Labı Testi (Docker Compose)")
+
+    p1_uid = PLAYERS["t1_p1"]["user_id"]
+    p1_tid = PLAYERS["t1_p1"]["team_id"]
+    ns_t1 = PLAYERS["t1_p1"]["ns"]
+    ns_t2 = PLAYERS["t2_p1"]["ns"]
+
+    try:
+        # 1. Challenge 2 için Compose Labını Başlat
+        launch_cmd = f"""python3 -c "
+import importlib
+from CTFd import create_app
+from CTFd.models import db, Solves
+app = create_app()
+with app.app_context():
+    mod = importlib.import_module('CTFd.plugins.ctfd-dehliz')
+    ComposeManager = mod.compose_manager.ComposeManager
+    DehlizComposeChallenge = mod.models.DehlizComposeChallenge
+    c2 = DehlizComposeChallenge.query.filter_by(id=2).first()
+    
+    # Temizlik: varsa önceki çözümü ve ortamı temizle
+    Solves.query.filter_by(challenge_id=2, user_id={p1_uid}).delete()
+    db.session.commit()
+    ComposeManager.destroy_instance(user_id={p1_uid}, challenge_id=2, team_id={p1_tid})
+    
+    ok, inst, msg = ComposeManager.create_instance(user_id={p1_uid}, team_id={p1_tid}, challenge=c2)
+    if ok:
+        print(f'COMPOSE_OK|{{inst.entrypoint_ip}}|{{inst.domain}}|{{inst.port}}|{{inst.flags}}')
+    else:
+        print(f'ERR|{{msg}}')
+" """
+        res = subprocess.run(["docker", "exec", "dehliz-ctf-ctfd-1", "sh", "-c", launch_cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        lines = [l for l in res.stdout.strip().splitlines() if l.startswith("COMPOSE_OK|")]
+        if not lines:
+            log_fail("Compose labı başlatılamadı", res.stdout or res.stderr)
+            return
+
+        parts = lines[0].split("|")
+        entry_ip, domain, port, flags_json = parts[1], parts[2], int(parts[3]), parts[4]
+        flags_dict = json.loads(flags_json)
+        log_pass(f"Çoklu konteynerli lab başlatıldı: {domain} ({entry_ip}:{port})")
+
+        # 2. Servisin hazır olmasını bekle
+        time.sleep(2)
+        cmd_http = f"ip netns exec {ns_t1} curl -s -m 5 http://{domain}:{port}/"
+        res_http = run_cmd(cmd_http, check=False)
+        if res_http.returncode == 0 and len(res_http.stdout) > 0:
+            log_pass(f"Team 1 giriş makinesine (DMZ) başarıyla bağlandı: http://{domain}:{port}/")
+        else:
+            log_fail("Giriş makinesine HTTP bağlantısı kurulamadı", res_http.stderr or res_http.stdout)
+
+        # 3. Güvenlik İzolasyonu: Team 2 bu Compose labına erişememeli (Firewall DROP)
+        res_t2 = run_cmd(f"ip netns exec {ns_t2} curl -s -m 3 http://{entry_ip}:{port}/", check=False)
+        if res_t2.returncode != 0:
+            log_pass(f"Team 2'nin Team 1 Compose labına erişimi ENGELLENDİ: http://{entry_ip}:{port}/ [Firewall DROP / Timeout]")
+        else:
+            log_fail("GÜVENLİK AÇIĞI! Team 2, Team 1 Compose labına sızabildi!", res_t2.stdout)
+
+        # 4. Soru Çözümü & Otomatik Kapatma (Compose Down)
+        target_flag = flags_dict.get("FLAG_FINAL") or flags_dict.get("FLAG_INITIAL") or list(flags_dict.values())[0]
+        solve_cmd = f"""python3 -c "
+from CTFd import create_app
+from CTFd.models import db, Users, Teams, Challenges
+from CTFd.plugins.challenges import get_chal_class
+from werkzeug.test import EnvironBuilder
+from flask import Request
+
+app = create_app()
+with app.app_context():
+    chall = Challenges.query.filter_by(id=2).first()
+    user = Users.query.filter_by(id={p1_uid}).first()
+    team = Teams.query.filter_by(id={p1_tid}).first() if {p1_tid} else None
+    
+    builder = EnvironBuilder(method='POST', data={{'submission': '{target_flag}'}}, environ_base={{'REMOTE_ADDR': '127.0.0.1'}})
+    req = Request(builder.get_environ())
+    
+    chal_class = get_chal_class(chall.type)
+    chal_class.solve(user=user, team=team, challenge=chall, request=req)
+    print('SOLVE_OK')
+" """
+        res_solve = subprocess.run(["docker", "exec", "dehliz-ctf-ctfd-1", "sh", "-c", solve_cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if "SOLVE_OK" in res_solve.stdout:
+            log_pass(f"Compose lab bayrağı çözüldü ({target_flag[:15]}...)")
+        else:
+            log_fail("Compose lab çözümü başarısız", res_solve.stdout or res_solve.stderr)
+
+        # 5. Tüm Compose projesinin otomatik yok edildiğini doğrula
+        time.sleep(2)
+        check_cmd = f"""python3 -c "
+import importlib
+from CTFd import create_app
+app = create_app()
+with app.app_context():
+    mod = importlib.import_module('CTFd.plugins.ctfd-dehliz')
+    ComposeManager = mod.compose_manager.ComposeManager
+    inst = ComposeManager.get_user_instance({p1_uid}, 2, team_id={p1_tid})
+    print('STILL_RUNNING' if inst else 'DESTROYED')
+" """
+        res_check = subprocess.run(["docker", "exec", "dehliz-ctf-ctfd-1", "sh", "-c", check_cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if "DESTROYED" in res_check.stdout:
+            log_pass("Tüm Compose projesi, iç ağları ve konteynerleri otomatik 'docker compose down' ile temizlendi!")
+        else:
+            log_fail("HATA: Compose projesi kapatılamadı!", res_check.stdout)
+
+    except Exception as e:
+        log_fail("Compose lab testi sırasında hata", str(e))
+
+
 def cleanup_namespaces():
     """Test bitiminde oluşturulan ağ isim alanlarını temizler."""
     for key, p in PLAYERS.items():
@@ -597,6 +706,7 @@ def main():
         test_9_renew_lab()
         test_10_destroy_and_cleanup()
         test_11_solve_auto_cleanup()
+        test_12_compose_lateral_movement()
     finally:
         cleanup_namespaces()
 
