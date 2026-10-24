@@ -73,8 +73,8 @@ def apply_team_firewall(team_id):
     team_vpn = f"10.13.{team_id}.0/24"
 
     commands = [
-        # 1. Takım oyuncuları CTFd Canlı Soru Havuzuna (10.0.1.0/24) erişebilir:
-        f"iptables -C FORWARD -i wg0 -s {team_vpn} -d 10.0.1.0/24 -j ACCEPT 2>/dev/null || iptables -I FORWARD 1 -i wg0 -s {team_vpn} -d 10.0.1.0/24 -j ACCEPT",
+        # 1. Takım oyuncuları CTFd Canlı Soru Havuzuna (10.0.0.0/16 - Tüm Docker Swarm Subnetleri) erişebilir:
+        f"iptables -C FORWARD -i wg0 -s {team_vpn} -d 10.0.0.0/16 -j ACCEPT 2>/dev/null || iptables -I FORWARD 1 -i wg0 -s {team_vpn} -d 10.0.0.0/16 -j ACCEPT",
         # 2. Takım oyuncuları KENDİ ÖZEL LABLARINA (10.10.T.0/24) erişebilir:
         f"iptables -C FORWARD -i wg0 -s {team_vpn} -d {team_net} -j ACCEPT 2>/dev/null || iptables -I FORWARD 2 -i wg0 -s {team_vpn} -d {team_net} -j ACCEPT",
         # 3. Takım oyuncuları BİRBİRLERİNE erişebilir (Takım içi işbirliği):
@@ -113,7 +113,7 @@ def register_peer(team_id, user_id, username="player"):
     # Kullanıcı zaten kayıtlıysa mevcut configi döndür
     if peer_key in peers:
         record = peers[peer_key]
-        if "DNS =" not in record.get("config", ""):
+        if "10.0.0.0/16" not in record.get("config", ""):
             server_pub = get_server_pubkey()
             priv = record.get("private_key", "")
             record["config"] = f"""[Interface]
@@ -124,7 +124,7 @@ DNS = {WG_DNS}
 [Peer]
 PublicKey = {server_pub}
 Endpoint = {WG_HOST}:{WG_PORT}
-AllowedIPs = 10.13.{team_id}.0/24, 10.0.1.0/24, 10.10.{team_id}.0/24, {WG_DNS}/32
+AllowedIPs = 10.13.{team_id}.0/24, 10.0.0.0/16, 10.10.{team_id}.0/24, {WG_DNS}/32
 PersistentKeepalive = 25
 """
             peers[peer_key] = record
@@ -161,7 +161,7 @@ DNS = {WG_DNS}
 [Peer]
 PublicKey = {server_pub}
 Endpoint = {WG_HOST}:{WG_PORT}
-AllowedIPs = 10.13.{team_id}.0/24, 10.0.1.0/24, 10.10.{team_id}.0/24, {WG_DNS}/32
+AllowedIPs = 10.13.{team_id}.0/24, 10.0.0.0/16, 10.10.{team_id}.0/24, {WG_DNS}/32
 PersistentKeepalive = 25
 """
 
