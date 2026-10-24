@@ -23,8 +23,7 @@ services:
       - .data/CTFd/logs:/var/log/CTFd
       - .data/CTFd/uploads:/var/uploads
       - /var/run/docker.sock:/var/run/docker.sock
-      - ./plugins/ctfd-wireguard:/opt/CTFd/CTFd/plugins/ctfd-wireguard
-      - ./plugins/ctfd-whale:/opt/CTFd/CTFd/plugins/ctfd-whale
+      - ./plugins/ctfd-dehliz:/opt/CTFd/CTFd/plugins/ctfd-dehliz
     networks:
       - dehliz_bridge
     depends_on:

@@ -2,14 +2,10 @@ FROM ctfd/ctfd:3.6.0
 
 USER root
 
-# Dehliz WireGuard ve Whale eklentilerini imaja ekle
-COPY plugins/ctfd-whale /opt/CTFd/CTFd/plugins/ctfd-whale
-COPY plugins/ctfd-wireguard /opt/CTFd/CTFd/plugins/ctfd-wireguard
+# Dehliz yerel orkestratör bağımlılıkları
+RUN pip install --no-cache-dir docker requests
 
-# Whale eklentisi bağımlılıklarını kur
-RUN pip install --no-cache-dir -r /opt/CTFd/CTFd/plugins/ctfd-whale/requirements.txt
-
-# API token kimlik doğrulamasında dosya yükleme (multipart/form-data) desteğini etkinleştir
-RUN sed -i 's/if token and request.content_type == "application\/json":/if token:/' /opt/CTFd/CTFd/utils/initialization/__init__.py
+# Dehliz CTF tümleşik eklentisini imaja ekle
+COPY plugins/ctfd-dehliz /opt/CTFd/CTFd/plugins/ctfd-dehliz
 
 USER root

@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="jumbotron">
+    <div class="container text-center">
+        <h1>🛡️ Dehliz CTF Lab VPN Bağlantısı</h1>
+        <p class="lead">Yarışmadaki tüm canlı soru hedeflerine ve takım içi işbirliği ağına güvenle bağlanın.</p>
+    </div>
+</div>
+
+<div class="container my-4">
+    {% if error_msg %}
+    <div class="alert alert-danger" role="alert">
+        <strong>⚠️ Hata:</strong> {{ error_msg }}
+        <p class="mb-0 mt-2">Lütfen CTF yöneticileriyle iletişime geçin.</p>
+    </div>
+    {% elif vpn_data %}
+    <div class="row">
+        <!-- Sol Kolon: Bağlantı Kartı & İndirme -->
+        <div class="col-lg-5 mb-4">
+            <div class="card shadow-sm border-0 h-100">
+                <div class="card-header bg-primary text-white font-weight-bold">
+                    📡 Bağlantı Durumu &amp; Profil
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <span class="badge badge-success px-3 py-2" style="font-size: 0.9rem;">● VPN PROFİLİNİZ HAZIR</span>
+                    </div>
+
+                    <table class="table table-sm table-bordered">
+                        <tbody>
+                            <tr>
+                                <th class="bg-light">Oyuncu:</th>
+                                <td><strong>{{ user.name }}</strong></td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light">Takım No:</th>
+                                <td><span class="badge badge-info">Takım {{ team_id }}</span></td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light">Atanan VPN IP:</th>
+                                <td><code class="text-primary font-weight-bold">{{ vpn_data.ip }}</code></td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light">Lab IP Bloğunuz:</th>
+                                <td><code>10.10.{{ team_id }}.0/24</code></td>
+                            </tr>
+                            <tr>
+                                <th class="bg-light">Takım Arkadaşları:</th>
+                                <td><code>10.13.{{ team_id }}.0/24</code></td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div class="mt-4">
+                        <a href="/vpn/download" class="btn btn-success btn-lg btn-block font-weight-bold shadow-sm">
+                            📥 WireGuard Profilini İndir (.conf)
+                        </a>
+                    </div>
+
+                    <div class="alert alert-info mt-3 small mb-0">
+                        💡 <strong>İpucu:</strong> Bu konfigürasyonu yarışma boyunca bir kez açmanız yeterlidir. Tüm canlı lab hedeflerine aynı tünelden erişebilirsiniz.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Sağ Kolon: Kurulum Rehberi & Konfigürasyon Önizlemesi -->
+        <div class="col-lg-7 mb-4">
+            <div class="card shadow-sm border-0 mb-4">
+                <div class="card-header bg-dark text-white font-weight-bold">
+                    🚀 Hızlı Bağlantı Kılavuzu
+                </div>
+                <div class="card-body">
+                    <ul class="nav nav-tabs mb-3" id="osTabs" role="tablist">
+                        <li class="nav-item">
+                            <a class="nav-link active font-weight-bold" id="win-tab" data-toggle="tab" href="#win" role="tab">Windows</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link font-weight-bold" id="kali-tab" data-toggle="tab" href="#kali" role="tab">Kali / Linux</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link font-weight-bold" id="mac-tab" data-toggle="tab" href="#mac" role="tab">macOS</a>
+                        </li>
+                    </ul>
+                    <div class="tab-content" id="osTabsContent">
+                        <div class="tab-pane fade show active" id="win" role="tabpanel">
+                            <ol class="pl-3">
+                                <li><a href="https://www.wireguard.com/install/" target="_blank">WireGuard for Windows</a> uygulamasını kurun.</li>
+                                <li>Sol alttaki <strong>"Tünel Ekle (Add Tunnel)"</strong> butonuna tıklayıp indirdiğiniz <code>.conf</code> dosyasını seçin.</li>
+                                <li><strong>"Etkinleştir (Activate)"</strong> butonuna basın. Tünel yeşil olduğunda hazırsınız!</li>
+                            </ol>
+                        </div>
+                        <div class="tab-pane fade" id="kali" role="tabpanel">
+                            <ol class="pl-3">
+                                <li>Terminalde WireGuard aracını kurun:
+                                    <pre class="bg-light p-2 border rounded"><code>sudo apt update &amp;&amp; sudo apt install -y wireguard-tools</code></pre>
+                                </li>
+                                <li>İndirdiğiniz dosyayı <code>/etc/wireguard/</code> dizinine taşıyıp başlatın:
+                                    <pre class="bg-light p-2 border rounded"><code>sudo cp dehliz-*.conf /etc/wireguard/dehliz.conf
+sudo wg-quick up dehliz</code></pre>
+                                </li>
+                            </ol>
+                        </div>
+                        <div class="tab-pane fade" id="mac" role="tabpanel">
+                            <ol class="pl-3">
+                                <li>App Store'dan <strong>WireGuard</strong> uygulamasını indirin.</li>
+                                <li><strong>"Add Tunnel"</strong> deyip indirilen <code>.conf</code> dosyasını seçin ve bağlanın.</li>
+                            </ol>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-secondary text-white font-weight-bold">
+                    📋 Konfigürasyon Dosyası (Önizleme)
+                </div>
+                <div class="card-body p-0">
+                    <pre class="p-3 mb-0 bg-light" style="font-size: 0.85rem; max-height: 180px; overflow-y: auto;"><code>{{ vpn_data.config }}</code></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
