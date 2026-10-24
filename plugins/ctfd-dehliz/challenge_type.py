@@ -128,7 +128,8 @@ class DehlizDockerChallenge(BaseChallenge):
 
         # Bayrak çözüldüğünde sunucu kaynağını boşa çıkarmak için konteyneri otomatik kapat
         try:
-            DockerManager.destroy_instance(user.id, challenge.id)
+            team_id = team.id if team else getattr(user, "team_id", None)
+            DockerManager.destroy_instance(user.id, challenge.id, team_id=team_id)
         except Exception:
             pass
 

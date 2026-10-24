@@ -450,6 +450,103 @@ with app.app_context():
         log_fail("Lab kapatılmasına rağmen servis hala yanıt veriyor!")
 
 
+def test_11_solve_auto_cleanup():
+    log_step("11. Soru Çözüldüğünde Otomatik Kapatma Testi (Auto-Destroy on Solve)")
+
+    p1_uid = PLAYERS["t1_p1"]["user_id"]
+    p1_tid = PLAYERS["t1_p1"]["team_id"]
+
+    try:
+        # 1. Team 1 için yeni bir soru konteyneri başlat
+        launch_cmd = f"""python3 -c "
+import importlib
+from CTFd import create_app
+from CTFd.models import db, Users, Solves
+app = create_app()
+with app.app_context():
+    mod = importlib.import_module('CTFd.plugins.ctfd-dehliz')
+    DockerManager = mod.docker_manager.DockerManager
+    DehlizChallenge = mod.models.DehlizChallenge
+    chall = DehlizChallenge.query.filter_by(id=1).first()
+    
+    # Varsa önceki çözümleri temizle (testin tekrar koşabilmesi için)
+    Solves.query.filter_by(challenge_id=1, user_id={p1_uid}).delete()
+    db.session.commit()
+    
+    ok, c, msg = DockerManager.create_instance(user_id={p1_uid}, team_id={p1_tid}, challenge=chall)
+    if ok:
+        print(f'LAUNCH_OK|{{c.ip_address}}|{{c.domain}}|{{c.docker_id}}|{{c.flag}}')
+    else:
+        print(f'ERR|{{msg}}')
+" """
+        res = subprocess.run(["docker", "exec", "dehliz-ctf-ctfd-1", "sh", "-c", launch_cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        lines = [l for l in res.stdout.strip().splitlines() if l.startswith("LAUNCH_OK|")]
+        if not lines:
+            log_fail("Çözüm testi için konteyner başlatılamadı", res.stdout or res.stderr)
+            return
+
+        parts = lines[0].split("|")
+        c_ip, c_dom, c_id, c_flag = parts[1], parts[2], parts[3], parts[4]
+        log_pass(f"Test için konteyner başlatıldı: {c_dom} ({c_ip})")
+
+        # 2. CTFd üzerinden soruyu çözdür (solve tetikle)
+        solve_cmd = f"""python3 -c "
+from CTFd import create_app
+from CTFd.models import db, Users, Teams, Challenges
+from CTFd.plugins.challenges import get_chal_class
+from werkzeug.test import EnvironBuilder
+from flask import Request
+
+app = create_app()
+with app.app_context():
+    chall = Challenges.query.filter_by(id=1).first()
+    user = Users.query.filter_by(id={p1_uid}).first()
+    team = Teams.query.filter_by(id={p1_tid}).first() if {p1_tid} else None
+    
+    builder = EnvironBuilder(method='POST', data={{'submission': '{c_flag}'}}, environ_base={{'REMOTE_ADDR': '127.0.0.1'}})
+    req = Request(builder.get_environ())
+    
+    chal_class = get_chal_class(chall.type)
+    chal_class.solve(user=user, team=team, challenge=chall, request=req)
+    print('SOLVE_OK')
+" """
+        res_solve = subprocess.run(["docker", "exec", "dehliz-ctf-ctfd-1", "sh", "-c", solve_cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if "SOLVE_OK" in res_solve.stdout:
+            log_pass(f"Doğru bayrak gönderildi ve soru çözüldü ({c_flag[:15]}...)")
+        else:
+            log_fail("Soru çözme işlemi başarısız", res_solve.stdout or res_solve.stderr)
+            return
+
+        # 3. Canlı konteynerin otomatik kapandığını doğrula
+        time.sleep(1)
+        check_cmd = f"""python3 -c "
+import importlib
+from CTFd import create_app
+app = create_app()
+with app.app_context():
+    mod = importlib.import_module('CTFd.plugins.ctfd-dehliz')
+    DockerManager = mod.docker_manager.DockerManager
+    c = DockerManager.get_user_container({p1_uid}, 1, team_id={p1_tid})
+    print('STILL_RUNNING' if c else 'DESTROYED')
+" """
+        res_check = subprocess.run(["docker", "exec", "dehliz-ctf-ctfd-1", "sh", "-c", check_cmd], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        if "DESTROYED" in res_check.stdout:
+            log_pass("Soru çözüldüğünde canlı konteyner veritabanından ve Swarm'dan otomatik kapatıldı!")
+        else:
+            log_fail("HATA: Soru çözüldü fakat konteyner hala çalışıyor!", res_check.stdout)
+
+        # 4. Gateway DNS kaydının silindiğini doğrula
+        status_data = http_get_json(f"{GATEWAY_API}/api/status")
+        dns_records = status_data.get("dns_records", {})
+        if c_dom not in dns_records:
+            log_pass(f"Gateway DNS kaydı otomatik temizlendi: {c_dom}")
+        else:
+            log_fail(f"Gateway DNS kaydı temizlenmedi: {c_dom}")
+
+    except Exception as e:
+        log_fail("Otomatik kapatma testi sırasında istisna", str(e))
+
+
 def cleanup_namespaces():
     """Test bitiminde oluşturulan ağ isim alanlarını temizler."""
     for key, p in PLAYERS.items():
@@ -499,6 +596,7 @@ def main():
         test_8_cross_team_lab_isolation()
         test_9_renew_lab()
         test_10_destroy_and_cleanup()
+        test_11_solve_auto_cleanup()
     finally:
         cleanup_namespaces()
 

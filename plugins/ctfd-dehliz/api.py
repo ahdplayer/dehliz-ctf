@@ -65,17 +65,18 @@ def get_container_status():
         return jsonify({"success": False, "message": "Giriş yapmalısınız."}), 403
 
     user = get_current_user()
+    team_id = user.team_id if user.team_id else user.id
     challenge_id = _get_challenge_id()
     if not challenge_id:
         return jsonify({"success": False, "message": "challenge_id parametresi gereklidir."}), 400
 
-    container = DockerManager.get_user_container(user.id, challenge_id)
+    container = DockerManager.get_user_container(user.id, challenge_id, team_id=team_id)
     if not container:
         return jsonify({"success": True, "data": {"status": "stopped"}})
 
     now = datetime.datetime.utcnow()
     if container.expire_time <= now:
-        DockerManager.destroy_instance(user.id, challenge_id)
+        DockerManager.destroy_instance(user.id, challenge_id, team_id=team_id)
         return jsonify({"success": True, "data": {"status": "stopped"}})
 
     remaining = int((container.expire_time - now).total_seconds())
@@ -138,11 +139,12 @@ def stop_container():
         return jsonify({"success": False, "message": "Giriş yapmalısınız."}), 403
 
     user = get_current_user()
+    team_id = user.team_id if user.team_id else user.id
     challenge_id = _get_challenge_id()
     if not challenge_id:
         return jsonify({"success": False, "message": "challenge_id gereklidir."}), 400
 
-    ok, msg = DockerManager.destroy_instance(user.id, challenge_id)
+    ok, msg = DockerManager.destroy_instance(user.id, challenge_id, team_id=team_id)
     return jsonify({"success": ok, "message": msg})
 
 
@@ -152,11 +154,12 @@ def renew_container():
         return jsonify({"success": False, "message": "Giriş yapmalısınız."}), 403
 
     user = get_current_user()
+    team_id = user.team_id if user.team_id else user.id
     challenge_id = _get_challenge_id()
     if not challenge_id:
         return jsonify({"success": False, "message": "challenge_id gereklidir."}), 400
 
-    ok, res = DockerManager.renew_instance(user.id, challenge_id)
+    ok, res = DockerManager.renew_instance(user.id, challenge_id, team_id=team_id)
     if not ok:
         return jsonify({"success": False, "message": res}), 400
 

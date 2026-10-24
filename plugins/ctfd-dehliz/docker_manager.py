@@ -47,7 +47,14 @@ def slugify(text):
 
 class DockerManager:
     @staticmethod
-    def get_user_container(user_id, challenge_id):
+    def get_user_container(user_id, challenge_id, team_id=None):
+        if team_id:
+            c = DehlizContainer.query.filter_by(
+                team_id=team_id,
+                challenge_id=challenge_id
+            ).first()
+            if c:
+                return c
         return DehlizContainer.query.filter_by(
             user_id=user_id,
             challenge_id=challenge_id
@@ -56,12 +63,12 @@ class DockerManager:
     @staticmethod
     def create_instance(user_id, team_id, challenge: DehlizChallenge):
         # 1. Kullanıcının/Takımın mevcut canlı konteyneri var mı?
-        existing = DockerManager.get_user_container(user_id, challenge.id)
+        existing = DockerManager.get_user_container(user_id, challenge.id, team_id=team_id)
         if existing:
             if existing.expire_time > datetime.datetime.utcnow():
                 return True, existing, "Konteyner zaten calisiyor."
             else:
-                DockerManager.destroy_instance(user_id, challenge.id)
+                DockerManager.destroy_instance(user_id, challenge.id, team_id=team_id)
 
         # 2. Maksimum global konteyner sınır kontrolü
         max_limit = int(get_config("dehliz:max_containers", 100))
@@ -165,11 +172,16 @@ class DockerManager:
         return True, container_record, "Konteyner basariyla baslatildi."
 
     @staticmethod
-    def destroy_instance(user_id, challenge_id=None, container_id=None):
+    def destroy_instance(user_id=None, challenge_id=None, container_id=None, team_id=None):
         query = DehlizContainer.query
+        record = None
         if container_id:
             record = query.filter_by(id=container_id).first()
-        else:
+        elif team_id and challenge_id:
+            record = query.filter_by(team_id=team_id, challenge_id=challenge_id).first()
+            if not record and user_id:
+                record = query.filter_by(user_id=user_id, challenge_id=challenge_id).first()
+        elif user_id and challenge_id:
             record = query.filter_by(user_id=user_id, challenge_id=challenge_id).first()
 
         if not record:
@@ -197,8 +209,8 @@ class DockerManager:
         return True, "Konteyner basariyla kapatildi."
 
     @staticmethod
-    def renew_instance(user_id, challenge_id):
-        record = DockerManager.get_user_container(user_id, challenge_id)
+    def renew_instance(user_id, challenge_id, team_id=None):
+        record = DockerManager.get_user_container(user_id, challenge_id, team_id=team_id)
         if not record:
             return False, "Yenilenecek aktif bir konteyner bulunamadi."
 
