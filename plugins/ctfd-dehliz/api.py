@@ -27,7 +27,7 @@ def format_user_access(container: DehlizContainer, challenge: DehlizChallenge):
     if "web" in cat or port in (80, 443, 3000, 5000, 8000, 8080):
         return (
             f'<div class="mb-2">'
-            f'<span class="badge badge-success px-2 py-1">🛡️ WireGuard &amp; Yerel DNS</span> '
+            f'<span class="badge bg-success badge-success text-white px-2 py-1" style="background-color: #28a745 !important; color: #ffffff !important;">🛡️ WireGuard &amp; Yerel DNS</span> '
             f'<small class="text-muted font-weight-bold">({container.ip_address})</small>'
             f'</div>'
             f'<a target="_blank" class="btn btn-primary btn-sm text-white font-weight-bold shadow-sm" '
@@ -35,7 +35,7 @@ def format_user_access(container: DehlizContainer, challenge: DehlizChallenge):
         )
     return (
         f'<div class="mb-2">'
-        f'<span class="badge badge-success px-2 py-1">🛡️ WireGuard &amp; Yerel DNS</span> '
+        f'<span class="badge bg-success badge-success text-white px-2 py-1" style="background-color: #28a745 !important; color: #ffffff !important;">🛡️ WireGuard &amp; Yerel DNS</span> '
         f'<small class="text-muted font-weight-bold">({container.ip_address})</small>'
         f'</div>'
         f'<code class="p-2 border rounded bg-light font-weight-bold text-dark">nc {host} {port}</code>'

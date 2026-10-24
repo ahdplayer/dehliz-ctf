@@ -1,6 +1,46 @@
 {% extends "base.html" %}
 
 {% block content %}
+<style>
+    .badge-success, .bg-success {
+        background-color: #28a745 !important;
+        color: #ffffff !important;
+    }
+    .badge-info, .bg-info {
+        background-color: #17a2b8 !important;
+        color: #ffffff !important;
+    }
+    .badge-primary, .bg-primary {
+        background-color: #0d6efd !important;
+        color: #ffffff !important;
+    }
+    .badge-warning, .bg-warning {
+        background-color: #ffc107 !important;
+        color: #212529 !important;
+    }
+    .badge-danger, .bg-danger {
+        background-color: #dc3545 !important;
+        color: #ffffff !important;
+    }
+    .dehliz-badge-ready {
+        background-color: #28a745 !important;
+        color: #ffffff !important;
+        font-size: 0.9rem;
+        padding: 0.5rem 1rem;
+        border-radius: 0.25rem;
+        display: inline-block;
+        font-weight: 700;
+    }
+    .dehliz-badge-team {
+        background-color: #17a2b8 !important;
+        color: #ffffff !important;
+        padding: 0.25rem 0.6rem;
+        border-radius: 0.25rem;
+        display: inline-block;
+        font-weight: 700;
+    }
+</style>
+
 <div class="jumbotron">
     <div class="container text-center">
         <h1>🛡️ Dehliz CTF Lab VPN Bağlantısı</h1>
@@ -24,18 +64,24 @@
                 </div>
                 <div class="card-body">
                     <div class="mb-3">
-                        <span class="badge badge-success px-3 py-2" style="font-size: 0.9rem;">● VPN PROFİLİNİZ HAZIR</span>
+                        <span class="badge bg-success badge-success text-white dehliz-badge-ready" style="background-color: #28a745 !important; color: #ffffff !important;">
+                            ● VPN PROFİLİNİZ HAZIR
+                        </span>
                     </div>
 
                     <table class="table table-sm table-bordered">
                         <tbody>
                             <tr>
-                                <th class="bg-light">Oyuncu:</th>
+                                <th class="bg-light" style="width: 40%;">Oyuncu:</th>
                                 <td><strong>{{ user.name }}</strong></td>
                             </tr>
                             <tr>
                                 <th class="bg-light">Takım No:</th>
-                                <td><span class="badge badge-info">Takım {{ team_id }}</span></td>
+                                <td>
+                                    <span class="badge bg-info badge-info text-white dehliz-badge-team" style="background-color: #17a2b8 !important; color: #ffffff !important;">
+                                        Takım {{ team_id }}
+                                    </span>
+                                </td>
                             </tr>
                             <tr>
                                 <th class="bg-light">Atanan VPN IP:</th>
