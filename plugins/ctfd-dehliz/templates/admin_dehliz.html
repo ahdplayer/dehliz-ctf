@@ -1,0 +1,286 @@
+{% extends "admin/base.html" %}
+
+{% block content %}
+<style>
+    .badge-success, .bg-success { background-color: #28a745 !important; color: #ffffff !important; }
+    .badge-info, .bg-info { background-color: #17a2b8 !important; color: #ffffff !important; }
+    .badge-primary, .bg-primary { background-color: #0d6efd !important; color: #ffffff !important; }
+    .badge-warning, .bg-warning { background-color: #ffc107 !important; color: #212529 !important; }
+    .badge-danger, .bg-danger { background-color: #dc3545 !important; color: #ffffff !important; }
+</style>
+<div class="jumbotron">
+    <div class="container">
+        <h1>🛡️ Dehliz CTF Yönetim Konsolu</h1>
+        <p class="lead">Canlı soru konteynerlerini, WireGuard tünellerini ve poligon ayarlarını yönetin.</p>
+    </div>
+</div>
+
+<div class="container my-4">
+    <ul class="nav nav-pills mb-4" id="dehlizAdminTabs" role="tablist">
+        <li class="nav-item">
+            <a class="nav-link active font-weight-bold" id="instances-tab" data-bs-toggle="pill" data-toggle="pill" data-bs-target="#instances" href="#instances" role="tab">
+                🎯 Canlı Lab Konteynerleri ({{ instances|length }})
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link font-weight-bold" id="gateway-tab" data-bs-toggle="pill" data-toggle="pill" data-bs-target="#gateway" href="#gateway" role="tab">
+                📡 WireGuard &amp; DNS Durumu
+            </a>
+        </li>
+        <li class="nav-item">
+            <a class="nav-link font-weight-bold" id="settings-tab" data-bs-toggle="pill" data-toggle="pill" data-bs-target="#settings" href="#settings" role="tab">
+                ⚙️ Sistem Ayarları
+            </a>
+        </li>
+    </ul>
+
+    <div class="tab-content" id="dehlizAdminTabContent">
+        <!-- 1. CANLI KONTEYNERLER -->
+        <div class="tab-pane fade show active" id="instances" role="tabpanel">
+            <div class="card shadow-sm border-0">
+                <div class="card-header bg-dark text-white font-weight-bold d-flex justify-content-between align-items-center">
+                    <span>Aktif Soru Konteynerleri</span>
+                    <span class="badge badge-primary">{{ instances|length }} Aktif</span>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table table-striped table-hover mb-0">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Takım / Oyuncu</th>
+                                <th>Soru</th>
+                                <th>Konteyner IP</th>
+                                <th>Alan Adı</th>
+                                <th>Kalan Süre</th>
+                                <th>Uzatma</th>
+                                <th>İşlem</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for c in instances %}
+                            <tr>
+                                <td>{{ c.id }}</td>
+                                <td>
+                                    <strong>{{ c.user.name }}</strong>
+                                    {% if c.team_id %}
+                                    <span class="badge badge-info">Takım {{ c.team_id }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ c.challenge.name if c.challenge else 'Bilinmiyor' }}</td>
+                                <td><code>{{ c.ip_address }}</code></td>
+                                <td><small class="text-primary font-weight-bold">{{ c.domain }}</small></td>
+                                <td>
+                                    {% set rem = (c.expire_time - now).total_seconds() | int %}
+                                    {% if rem > 0 %}
+                                    <span class="badge badge-success">{{ (rem // 60) }} dk {{ (rem % 60) }} sn</span>
+                                    {% else %}
+                                    <span class="badge badge-danger">Süresi Doldu</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ c.renew_count }}</td>
+                                <td>
+                                    <form method="POST" action="/admin/dehliz/terminate/{{ c.id }}" onsubmit="return confirm('Bu konteyneri zorla sonlandırmak istediğinize emin misiniz?');">
+                                        <input type="hidden" name="nonce" value="{{ Session.nonce }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">⏹️ Kapat</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="8" class="text-center py-4 text-muted">
+                                    Şu anda yarışmacılar tarafından açılmış aktif bir lab konteyneri bulunmuyor.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Aktif Compose Labları (Lateral Movement / Pivoting) -->
+        <div class="card shadow-sm mb-4">
+            <div class="card-header bg-white font-weight-bold d-flex justify-content-between align-items-center">
+                <span><i class="fas fa-network-wired pe-1 text-primary"></i> Canlı Çoklu Konteyner &amp; Lateral Movement (Compose) Labları</span>
+                <span class="badge bg-primary text-white" style="background-color: #0d6efd !important;">{{ compose_instances | length }} Aktif Stack</span>
+            </div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover mb-0">
+                        <thead class="thead-light">
+                            <tr>
+                                <th>#</th>
+                                <th>Takım / Oyuncu</th>
+                                <th>Soru</th>
+                                <th>Proje Adı</th>
+                                <th>Giriş IP</th>
+                                <th>Yerel Alan Adı</th>
+                                <th>Kalan Süre</th>
+                                <th>İşlem</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for inst in compose_instances %}
+                            <tr>
+                                <td>{{ inst.id }}</td>
+                                <td>
+                                    <strong>{{ inst.user.name }}</strong>
+                                    {% if inst.team_id %}
+                                    <span class="badge bg-info text-white" style="background-color: #0dcaf0 !important;">Takım {{ inst.team_id }}</span>
+                                    {% endif %}
+                                </td>
+                                <td>{{ inst.challenge.name if inst.challenge else 'Bilinmiyor' }}</td>
+                                <td><code>{{ inst.project_name }}</code></td>
+                                <td><code>{{ inst.entrypoint_ip }}</code></td>
+                                <td><small class="text-primary font-weight-bold">{{ inst.domain }}</small></td>
+                                <td>
+                                    {% set rem = (inst.expire_time - now).total_seconds() | int %}
+                                    {% if rem > 0 %}
+                                    <span class="badge bg-success text-white" style="background-color: #198754 !important;">{{ (rem // 60) }} dk {{ (rem % 60) }} sn</span>
+                                    {% else %}
+                                    <span class="badge bg-danger text-white" style="background-color: #dc3545 !important;">Süresi Doldu</span>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <form method="POST" action="/admin/dehliz/terminate-compose/{{ inst.id }}" onsubmit="return confirm('Bu Compose ortamını ve tüm iç ağlarını sonlandırmak istediğinize emin misiniz?');">
+                                        <input type="hidden" name="nonce" value="{{ Session.nonce }}">
+                                        <button type="submit" class="btn btn-sm btn-outline-danger">⏹️ Kapat</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% else %}
+                            <tr>
+                                <td colspan="8" class="text-center py-4 text-muted">
+                                    Şu anda yarışmacılar tarafından açılmış aktif bir Compose ortamı bulunmuyor.
+                                </td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. GATEWAY & DNS DURUMU -->
+        <div class="tab-pane fade" id="gateway" role="tabpanel">
+            <div class="row">
+                <div class="col-md-4 mb-4">
+                    <div class="card shadow-sm border-0 h-100">
+                        <div class="card-header bg-primary text-white font-weight-bold">
+                            Gateway Durumu
+                        </div>
+                        <div class="card-body">
+                            <p><strong>Durum:</strong> 
+                                {% if gw_stats.get('status') == 'online' %}
+                                <span class="badge badge-success px-2 py-1">ONLINE</span>
+                                {% else %}
+                                <span class="badge badge-danger px-2 py-1">OFFLINE</span>
+                                {% endif %}
+                            </p>
+                            <p><strong>DNS Sunucusu:</strong> <code>10.13.37.1:53</code></p>
+                            <p><strong>Kayıtlı Peer Sayısı:</strong> {{ gw_stats.get('total_registered_peers', 0) }}</p>
+                            <p><strong>Aktif DNS Kayıtları:</strong> {{ gw_stats.get('dns_records', {}) | length }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-8 mb-4">
+                    <div class="card shadow-sm border-0 mb-4">
+                        <div class="card-header bg-secondary text-white font-weight-bold">
+                            Canlı DNS Kayıtları (dnsmasq)
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-sm table-bordered mb-0">
+                                <thead>
+                                    <tr>
+                                        <th>Alan Adı (*.dehliz.local)</th>
+                                        <th>Yönlendirilen Konteyner IP</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for domain, ip in gw_stats.get('dns_records', {}).items() %}
+                                    <tr>
+                                        <td><code>{{ domain }}</code></td>
+                                        <td><span class="badge badge-success">{{ ip }}</span></td>
+                                    </tr>
+                                    {% else %}
+                                    <tr>
+                                        <td colspan="2" class="text-center py-3 text-muted">Henüz kayıtlı soru DNS'i bulunmuyor.</td>
+                                    </tr>
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. SİSTEM AYARLARI -->
+        <div class="tab-pane fade" id="settings" role="tabpanel">
+            <div class="card shadow-sm border-0 col-md-8 mx-auto">
+                <div class="card-header bg-dark text-white font-weight-bold">
+                    ⚙️ Dehliz Tatbikat Sahası Parametreleri
+                </div>
+                <div class="card-body">
+                    <form method="POST" action="/admin/dehliz/settings">
+                        <input type="hidden" name="nonce" value="{{ Session.nonce }}">
+
+                        <div class="form-group">
+                            <label for="timeout">Varsayılan Konteyner Süresi (Saniye)<br>
+                                <small class="form-text text-muted">Örn: 3600 (60 dakika)</small>
+                            </label>
+                            <input type="number" class="form-control" name="timeout" value="{{ settings.timeout }}" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="renew_time">Süre Uzatma Miktarı (Saniye)<br>
+                                <small class="form-text text-muted">Yarışmacı her 'Süreyi Uzat' dediğinde eklenecek süre (Örn: 1800 = 30 dk)</small>
+                            </label>
+                            <input type="number" class="form-control" name="renew_time" value="{{ settings.renew_time }}" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="max_renews">Maksimum Uzatma Hakkı<br>
+                                <small class="form-text text-muted">Bir yarışmacının bir soru için süreyi kaç kez uzatabileceği (Örn: 5)</small>
+                            </label>
+                            <input type="number" class="form-control" name="max_renews" value="{{ settings.max_renews }}" required>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="max_containers">Maksimum Eşzamanlı Konteyner Sayısı<br>
+                                <small class="form-text text-muted">Sunucu kaynaklarını korumak için toplam azami canlı lab sayısı (Örn: 100)</small>
+                            </label>
+                            <input type="number" class="form-control" name="max_containers" value="{{ settings.max_containers }}" required>
+                        </div>
+
+                        <button type="submit" class="btn btn-primary font-weight-bold px-4">Kaydet</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    var tabs = document.querySelectorAll("#dehlizAdminTabs .nav-link");
+    tabs.forEach(function (tab) {
+        tab.addEventListener("click", function (e) {
+            e.preventDefault();
+            tabs.forEach(function (t) { t.classList.remove("active"); });
+            this.classList.add("active");
+
+            var panes = document.querySelectorAll("#dehlizAdminTabContent .tab-pane");
+            panes.forEach(function (p) { p.classList.remove("show", "active"); });
+
+            var targetSelector = this.getAttribute("data-bs-target") || this.getAttribute("href");
+            var targetPane = document.querySelector(targetSelector);
+            if (targetPane) {
+                targetPane.classList.add("show", "active");
+            }
+        });
+    });
+});
+</script>
+{% endblock %}

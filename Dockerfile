@@ -1,15 +1,20 @@
-FROM ctfd/ctfd:3.6.0
+FROM docker:latest AS docker-cli
+FROM docker/compose-bin:latest AS compose-bin
+
+FROM ctfd/ctfd:3.8.9
 
 USER root
 
-# Dehliz WireGuard ve Whale eklentilerini imaja ekle
-COPY plugins/ctfd-whale /opt/CTFd/CTFd/plugins/ctfd-whale
-COPY plugins/ctfd-wireguard /opt/CTFd/CTFd/plugins/ctfd-wireguard
+# Docker CLI ve Docker Compose eklentisini ekle
+COPY --from=docker-cli /usr/local/bin/docker /usr/local/bin/docker
+COPY --from=compose-bin /docker-compose /usr/local/lib/docker/cli-plugins/docker-compose
+RUN chmod +x /usr/local/bin/docker /usr/local/lib/docker/cli-plugins/docker-compose && \
+    ln -sf /usr/local/lib/docker/cli-plugins/docker-compose /usr/local/bin/docker-compose
 
-# Whale eklentisi bağımlılıklarını kur
-RUN pip install --no-cache-dir -r /opt/CTFd/CTFd/plugins/ctfd-whale/requirements.txt
+# Dehliz yerel orkestratör bağımlılıkları
+RUN pip install --no-cache-dir docker requests pyyaml
 
-# API token kimlik doğrulamasında dosya yükleme (multipart/form-data) desteğini etkinleştir
-RUN sed -i 's/if token and request.content_type == "application\/json":/if token:/' /opt/CTFd/CTFd/utils/initialization/__init__.py
+# Dehliz CTF tümleşik eklentisini imaja ekle
+COPY plugins/ctfd-dehliz /opt/CTFd/CTFd/plugins/ctfd-dehliz
 
 USER root

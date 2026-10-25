@@ -5,9 +5,9 @@
 [![Docker Swarm](https://img.shields.io/badge/Orchestration-Docker%20Swarm-2496ED.svg?style=flat-square&logo=docker)](https://docs.docker.com/engine/swarm/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](https://opensource.org/licenses/MIT)
 
-> *"Karanlıkta kalan portlar, aşılamaz surlar ve sadece tünelden sızılabilen bir siber poligon."*
+> _"Karanlıkta kalan portlar, aşılamaz surlar ve sadece tünelden sızılabilen bir siber poligon."_
 
-**Dehliz CTF**, CTFd platformunu tek bir komutla Hack The Box / Cyber Range kalitesinde **izole, çok kiracılı (multi-tenant) ve şifreli tünelli bir siber tatbikat sahasına** dönüştüren açık kaynaklı bir altyapı motorudur.
+**Dehliz CTF**, CTFd platformunu tek bir komutla Hack The Box / Cyber Range kalitesinde **izole, multi-tenant ve şifreli tünelli bir siber tatbikat sahasına** dönüştüren açık kaynaklı bir altyapı motorudur.
 
 Geleneksel CTF'lerin FRP port karmaşasını (`185.x.x.x:31452`) tarihe gömer; sıfır dış port kuralı, takım içi serbest haberleşme, tam takım izolasyonu ve otomatik yerel DNS (`*.dehliz.local`) sunar.
 
@@ -15,16 +15,16 @@ Geleneksel CTF'lerin FRP port karmaşasını (`185.x.x.x:31452`) tarihe gömer; 
 
 ## 🌟 Neden Dehliz CTF? (Geleneksel FRP vs Dehliz)
 
-| Özellik | Geleneksel CTFd + FRP | 🛡️ Dehliz CTF |
-| :--- | :--- | :--- |
-| **Dış Port Güvenliği** | Her soru için internete rastgele port açılır | **0 Dış Port!** Konteynerler internete tamamen kapalıdır |
-| **Bağlantı Türü** | TCP Port Forwarding | **WireGuard Kriptografik Şifreli Tünel** |
-| **Ad Çözümleme (DNS)** | Yok (Yalnızca çirkin IP ve portlar) | **Otomatik Yerel DNS:** `http://soru-adi.dehliz.local` |
-| **Ters Bağlantı (Reverse Shell)** | İmkansız / Çok Zor (Modem NAT engeli) | **Doğrudan Oyuncunun VPN IP'sine:** `nc 10.13.1.2 4444` |
-| **Ağ Taraması (Port Scan)** | Yapılamaz (Yalnızca verilen tek port) | **Tam Nmap Desteği:** `nmap soru-adi.dehliz.local` |
-| **Takım İzolasyonu** | Yok (Takımlar birbirine saldırabilir) | **Çekirdek Düzeyinde `iptables` Mikro-Bölümleme (DROP)** |
-| **Takım İçi İşbirliği** | Yok | **Serbest:** Takım arkadaşları birbirinin IP'sine erişebilir |
-| **Kaynak Tüketimi** | Ağır Java/Go proxy'leri | **Ultra Hafif:** Alpine Linux Gateway (~50 MB RAM!) |
+| Özellik                           | Geleneksel CTFd + FRP                        | 🛡️ Dehliz CTF                                                |
+| :-------------------------------- | :------------------------------------------- | :----------------------------------------------------------- |
+| **Dış Port Güvenliği**            | Her soru için internete rastgele port açılır | **0 Dış Port!** Konteynerler internete tamamen kapalıdır     |
+| **Bağlantı Türü**                 | TCP Port Forwarding                          | **WireGuard Kriptografik Şifreli Tünel**                     |
+| **Ad Çözümleme (DNS)**            | Yok (Yalnızca çirkin IP ve portlar)          | **Otomatik Yerel DNS:** `http://soru-adi.dehliz.local`       |
+| **Ters Bağlantı (Reverse Shell)** | İmkansız / Çok Zor (Modem NAT engeli)        | **Doğrudan Oyuncunun VPN IP'sine:** `nc 10.13.1.2 4444`      |
+| **Ağ Taraması (Port Scan)**       | Yapılamaz (Yalnızca verilen tek port)        | **Tam Nmap Desteği:** `nmap soru-adi.dehliz.local`           |
+| **Takım İzolasyonu**              | Yok (Takımlar birbirine saldırabilir)        | **Çekirdek Düzeyinde `iptables` Mikro-Bölümleme (DROP)**     |
+| **Takım İçi İşbirliği**           | Yok                                          | **Serbest:** Takım arkadaşları birbirinin IP'sine erişebilir |
+| **Kaynak Tüketimi**               | Ağır Java/Go proxy'leri                      | **Ultra Hafif:** Alpine Linux Gateway (~50 MB RAM!)          |
 
 ---
 
@@ -75,10 +75,12 @@ flowchart TD
 ## ⚡ Hızlı Kurulum (Quickstart)
 
 ### Gereksinimler:
-* Linux (Ubuntu / Debian / CentOS / Arch) veya Windows (Docker Desktop WSL2)
-* Docker & Docker Compose v2+
+
+- Linux (Ubuntu / Debian / CentOS / Arch) veya Windows (Docker Desktop WSL2)
+- Docker & Docker Compose v2+
 
 ### 1. Depoyu Klonlayın
+
 ```bash
 git clone https://github.com/your-username/dehliz-ctf.git
 cd dehliz-ctf
@@ -87,21 +89,24 @@ cd dehliz-ctf
 ### 2. Tek Komutla Kurulumu Başlatın
 
 **Linux / macOS:**
+
 ```bash
 chmod +x install.sh
 ./install.sh
 ```
 
 **Windows (PowerShell):**
+
 ```powershell
 Set-ExecutionPolicy Bypass -Scope Process -Force
 .\install.ps1
 ```
 
 Kurulum tamamlandığında:
-* **CTFd Web Paneli:** `http://localhost:8000`
-* **WireGuard Portu:** `51820/UDP`
-* **Yerel DNS:** `10.13.37.1:53` (*.dehliz.local)
+
+- **CTFd Web Paneli:** `http://localhost:8000`
+- **WireGuard Portu:** `51820/UDP`
+- **Yerel DNS:** `10.13.37.1:53` (\*.dehliz.local)
 
 ---
 
@@ -126,6 +131,7 @@ SECRET_KEY=super_gizli_uretim_anahtari_2026
 ## 🚀 Soru Ekleme & Geliştirme
 
 Dehliz CTF için soru hazırlamak çok kolaydır:
+
 1. `examples/sample-challenge` dizinindeki hazır şablonu inceleyin.
 2. Konteynerinizi oluşturup build edin:
    ```bash
@@ -136,5 +142,35 @@ Dehliz CTF için soru hazırlamak çok kolaydır:
 
 ---
 
+## 🧪 Otomatik Siber Poligon & Güvenlik İzolasyon Testleri
+
+Dehliz CTF, tüm mikro-bölümleme kurallarını, WireGuard tünellerini, Swarm yaşam döngüsünü ve takımlar arası izolasyonu uçtan uca doğrulayan otomatik bir test paketine sahiptir.
+
+### Tek Komutla Testleri Çalıştırma:
+
+**Windows (PowerShell):**
+```powershell
+.\tests\run_tests.ps1
+```
+
+**Linux / macOS (Bash):**
+```bash
+chmod +x ./tests/run_tests.sh
+./tests/run_tests.sh
+```
+
+### Otomatik Olarak Doğrulanan Senaryolar:
+1. **Altyapı Kontrolü:** WireGuard Gateway API, CTFd ve Docker Swarm Overlay ağı.
+2. **Dinamik Peer & Tünel:** Takım 1 (2 oyuncu) ve Takım 2 (1 oyuncu) için anahtar üretimi ve canlı tünel el sıkışması (`10.13.37.1`).
+3. **Lab Yaşam Döngüsü:** Dinamik soru başlatma, Swarm IP tespiti ve Gateway yerel DNS (`*.dehliz.local`) kaydı.
+4. **Yetkili Erişim:** Takım oyuncusunun yerel DNS ve direkt IP üzerinden kendi labına erişimi (`HTTP 200 OK`).
+5. **Takım İçi İşbirliği:** Aynı takımdaki oyuncuların birbirinin VPN IP'sine serbestçe erişebilmesi (`ping 0% kayıp`).
+6. **Takımlar Arası Oyuncu İzolasyonu:** Rakip takımın diğer takımın oyuncularına saldırmasının engellenmesi (`Firewall DROP`).
+7. **Takımlar Arası Lab İzolasyonu:** Rakip takımın diğer takımın soru labına sızmasının engellenmesi (`Firewall DROP / Timeout`).
+8. **Süre Uzatma & Temizlik:** Lab yenileme, kapatma, Swarm konteynerinin silinmesi ve DNS/Firewall kurallarının temizlenmesi.
+
+---
+
 ## 📄 Lisans
+
 Bu proje [MIT Lisansı](LICENSE) ile lisanslanmıştır. Eğitim, akademik ve ticari amaçlarla özgürce kullanılabilir ve geliştirilebilir.

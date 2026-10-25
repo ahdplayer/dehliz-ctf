@@ -1,0 +1,81 @@
+{% extends "admin/challenges/update.html" %}
+
+{% block value %}
+<div class="form-group mb-3">
+    <label for="value" class="fw-bold">Mevcut Puan<br>
+        <small class="form-text text-muted">Sorunun şu anki puanı</small>
+    </label>
+    <input type="number" class="form-control chal-value" name="value" value="{{ challenge.value }}" disabled>
+</div>
+
+<div class="form-group mb-3">
+    <label for="initial" class="fw-bold">Başlangıç Puanı<br>
+        <small class="form-text text-muted">Sorunun ilk puanı</small>
+    </label>
+    <input type="number" class="form-control chal-initial" name="initial" value="{{ challenge.initial }}" required>
+</div>
+
+<div class="form-group mb-3">
+    <label for="decay" class="fw-bold">Düşüş Limiti (Decay)<br>
+        <small class="form-text text-muted">Puanın tabana ineceği çözüm sayısı</small>
+    </label>
+    <input type="number" class="form-control chal-decay" name="decay" value="{{ challenge.decay }}" required>
+</div>
+
+<div class="form-group mb-3">
+    <label for="minimum" class="fw-bold">Taban Puan<br>
+        <small class="form-text text-muted">İnebileceği minimum puan</small>
+    </label>
+    <input type="number" class="form-control chal-minimum" name="minimum" value="{{ challenge.minimum }}" required>
+</div>
+
+<hr>
+
+<div class="alert alert-primary" role="alert">
+    <strong><i class="fas fa-network-wired pe-1"></i> Dehliz Çoklu Konteyner (Compose) Yapılandırması:</strong>
+    Aşağıdaki alandan <code>docker-compose.yml</code> içeriğini doğrudan düzenleyebilirsiniz.
+</div>
+
+<div class="form-group mb-3">
+    <label for="compose_content" class="fw-bold">Docker Compose Yapılandırması (YAML)<br>
+        <small class="form-text text-muted">Tüm servislerin ve iç ağların tanımlandığı dosya içeriği</small>
+    </label>
+    <textarea class="form-control font-monospace" name="compose_content" rows="14" style="font-family: monospace; font-size: 0.9rem;" required>{{ challenge.compose_content }}</textarea>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-6">
+        <div class="form-group">
+            <label for="entrypoint_service" class="fw-bold">Giriş Servisi Adı<br>
+                <small class="form-text text-muted">Oyuncunun erişeceği DMZ servisi</small>
+            </label>
+            <input type="text" class="form-control" name="entrypoint_service" value="{{ challenge.entrypoint_service or '' }}">
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="form-group">
+            <label for="container_port" class="fw-bold">Hedef Port<br>
+                <small class="form-text text-muted">Giriş servisinin portu</small>
+            </label>
+            <input type="number" class="form-control" name="container_port" value="{{ challenge.container_port }}" required>
+        </div>
+    </div>
+</div>
+
+<div class="form-group mb-3">
+    <label for="total_memory_limit" class="fw-bold">Toplam RAM Limiti<br>
+        <small class="form-text text-muted">Tüm compose labı için ayrılan azami toplam bellek</small>
+    </label>
+    <input type="text" class="form-control" name="total_memory_limit" value="{{ challenge.total_memory_limit or '1024m' }}" required>
+</div>
+
+<div class="form-group mb-3">
+    <label for="dynamic_score" class="fw-bold">Puanlama Modeli<br>
+        <small class="form-text text-muted">Puanın çözüldükçe azalıp azalmayacağını belirleyin</small>
+    </label>
+    <select class="form-control form-select" name="dynamic_score">
+        <option value="1" {% if challenge.dynamic_score %}selected{% endif %}>Dinamik Puanlama (Çözüldükçe Düşen)</option>
+        <option value="0" {% if not challenge.dynamic_score %}selected{% endif %}>Sabit Puanlama</option>
+    </select>
+</div>
+{% endblock %}

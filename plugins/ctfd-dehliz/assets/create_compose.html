@@ -1,0 +1,110 @@
+{% extends "admin/challenges/create.html" %}
+
+{% block header %}
+<div class="alert alert-primary shadow-sm" role="alert">
+    <h5><i class="fas fa-network-wired pe-1"></i> 🛡️ Dehliz Çoklu Konteyner &amp; Lateral Movement Labı</h5>
+    <p class="mb-0">
+        Bu soru tipi, her takım için izole bir <strong>Docker Compose</strong> projesi ayağa kaldırır. 
+        Giriş makinesi (DMZ/Entrypoint) haricindeki tüm makineler takımın <strong>özel iç ağında (internal bridge)</strong> gizli kalarak 
+        gerçekçi <em>pivoting</em> ve <em>lateral movement</em> senaryolarını mümkün kılar.
+    </p>
+</div>
+{% endblock %}
+
+{% block value %}
+<div class="form-group mb-3">
+    <label for="compose_content" class="fw-bold">Docker Compose Yapılandırması (YAML)<br>
+        <small class="form-text text-muted">
+            Labı oluşturan tüm servislerin, iç ağların ve bayrakların tanımlandığı <code>docker-compose.yml</code> içeriği.
+            Oyuncunun ilk erişeceği servise <code>labels: ["dehliz.entrypoint=true"]</code> etiketi ekleyin.
+        </small>
+    </label>
+    <textarea class="form-control font-monospace" name="compose_content" rows="14" style="font-family: monospace; font-size: 0.9rem;" placeholder="version: '3.8'
+services:
+  web-dmz:
+    image: sample-chall:latest
+    labels:
+      - 'dehliz.entrypoint=true'
+    networks:
+      - dehliz_containers
+      - internal_corp_net
+    environment:
+      - FLAG_INITIAL=DEHLIZ{web_rce}
+
+  internal-db:
+    image: mariadb:10.4
+    networks:
+      - internal_corp_net
+    environment:
+      - FLAG_FINAL=DEHLIZ{domain_admin}
+
+networks:
+  dehliz_containers:
+    external: true
+  internal_corp_net:
+    driver: bridge" required></textarea>
+</div>
+
+<div class="row mb-3">
+    <div class="col-md-6">
+        <div class="form-group">
+            <label for="entrypoint_service" class="fw-bold">Giriş Servisi Adı (Opsiyonel)<br>
+                <small class="form-text text-muted">Belirtilmezse <code>dehliz.entrypoint=true</code> etiketli servis veya ilk servis seçilir</small>
+            </label>
+            <input type="text" class="form-control" name="entrypoint_service" placeholder="Örn: web-dmz">
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="form-group">
+            <label for="container_port" class="fw-bold">Giriş Portu (Entrypoint Port)<br>
+                <small class="form-text text-muted">Giriş servisinin dinlediği iç port (Örn: HTTP için <code>80</code> veya <code>5000</code>)</small>
+            </label>
+            <input type="number" class="form-control" name="container_port" placeholder="80" value="80" required>
+        </div>
+    </div>
+</div>
+
+<div class="form-group mb-3">
+    <label for="total_memory_limit" class="fw-bold">Toplam RAM Limiti<br>
+        <small class="form-text text-muted">Tüm compose labı için ayrılan azami toplam bellek (Örn: <code>512m</code>, <code>1024m</code>, <code>2g</code>)</small>
+    </label>
+    <input type="text" class="form-control" name="total_memory_limit" value="1024m" required>
+</div>
+
+<hr>
+
+<div class="form-group mb-3">
+    <label for="value" class="fw-bold">Başlangıç Puanı (Initial)<br>
+        <small class="form-text text-muted">Sorunun başlangıçtaki azami puanı</small>
+    </label>
+    <input type="number" class="form-control" name="value" placeholder="1000" value="1000" required>
+</div>
+
+<div class="form-group mb-3">
+    <label for="decay" class="fw-bold">Düşüş Katsayısı (Decay)<br>
+        <small class="form-text text-muted">Puanın taban seviyeye inmesi için gereken çözüm sayısı</small>
+    </label>
+    <input type="number" class="form-control" name="decay" placeholder="20" value="20" required>
+</div>
+
+<div class="form-group mb-3">
+    <label for="minimum" class="fw-bold">Taban Puan (Minimum)<br>
+        <small class="form-text text-muted">Sorunun inebileceği en düşük puan</small>
+    </label>
+    <input type="number" class="form-control" name="minimum" placeholder="100" value="100" required>
+</div>
+
+<div class="form-group mb-3">
+    <label for="dynamic_score" class="fw-bold">Puanlama Modeli<br>
+        <small class="form-text text-muted">Puanın çözüldükçe azalıp azalmayacağını belirleyin</small>
+    </label>
+    <select class="form-control form-select" name="dynamic_score">
+        <option value="1" selected>Dinamik Puanlama (Çözüldükçe Düşen)</option>
+        <option value="0">Sabit Puanlama</option>
+    </select>
+</div>
+{% endblock %}
+
+{% block type %}
+<input type="hidden" value="dehliz_compose" name="type" id="chaltype">
+{% endblock %}
